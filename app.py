@@ -2,6 +2,7 @@
 import datetime
 import io
 import os
+import re
 import threading
 import time
 from pathlib import Path
@@ -77,6 +78,21 @@ def process():
     url = data.get("url", "").strip()
     asr_enabled = data.get("asr", True)
     summary_enabled = data.get("summary", True)
+
+    # 从整段文本中提取抖音链接
+    douyin_patterns = [
+        r'https?://v\.douyin\.com/[A-Za-z0-9_-]+',
+        r'https?://(?:www\.)?douyin\.com/video/\d+',
+        r'https?://(?:www\.)?iesdouyin\.com/share/video/\d+',
+    ]
+    extracted = None
+    for pat in douyin_patterns:
+        m = re.search(pat, url)
+        if m:
+            extracted = m.group(0)
+            break
+    if extracted:
+        url = extracted
 
     if not url:
         return jsonify({"error": "请输入抖音链接"}), 400
