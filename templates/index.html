@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>抖音工作台</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f13; color: #e4e4e7; min-height: 100vh; }
+
+/* 顶栏 */
+.header { background: #1a1a23; border-bottom: 1px solid #2a2a35; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+.header h1 { font-size: 18px; font-weight: 600; color: #fff; }
+.header h1 span { color: #ea580c; }
+.header-actions { display: flex; gap: 8px; }
+.btn-config { padding: 6px 14px; background: #2a2a35; color: #a1a1aa; border: 1px solid #3a3a45; border-radius: 6px; cursor: pointer; font-size: 13px; transition: .2s; }
+.btn-config:hover { background: #3a3a45; color: #fff; }
+
+/* 搜索区 */
+.input-area { max-width: 720px; margin: 32px auto 0; padding: 0 20px; }
+.input-row { display: flex; gap: 8px; }
+.input-row input { flex: 1; padding: 12px 16px; background: #1a1a23; border: 1px solid #2a2a35; border-radius: 8px; color: #e4e4e7; font-size: 15px; outline: none; transition: .2s; }
+.input-row input:focus { border-color: #ea580c; }
+.input-row input::placeholder { color: #52525b; }
+.btn-process { padding: 12px 28px; background: #ea580c; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: .2s; }
+.btn-process:hover { background: #d97706; }
+.btn-process:disabled { opacity: .5; cursor: not-allowed; }
+
+.input-hint { margin-top: 8px; font-size: 12px; color: #52525b; }
+.input-hint label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; margin-right: 12px; }
+.input-hint input[type="checkbox"] { accent-color: #ea580c; }
+
+/* 加载 */
+.loading { display: none; text-align: center; padding: 40px; }
+.loading.active { display: block; }
+.loading .spinner { width: 32px; height: 32px; border: 3px solid #2a2a35; border-top-color: #ea580c; border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading .step { font-size: 13px; color: #a1a1aa; }
+
+/* 结果区 */
+.result { display: none; max-width: 720px; margin: 24px auto 0; padding: 0 20px; }
+.result.active { display: block; }
+.result-card { background: #1a1a23; border: 1px solid #2a2a35; border-radius: 10px; padding: 20px; }
+.result-card h2 { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+.result-card .meta { font-size: 13px; color: #71717a; margin-bottom: 16px; }
+.result-card .meta span { margin-right: 16px; }
+
+/* Tab */
+.tabs { display: flex; gap: 2px; background: #2a2a35; border-radius: 6px; padding: 3px; margin-bottom: 16px; }
+.tab-btn { flex: 1; padding: 8px; text-align: center; font-size: 13px; color: #a1a1aa; border-radius: 4px; cursor: pointer; transition: .2s; border: none; background: none; }
+.tab-btn:hover { color: #e4e4e7; }
+.tab-btn.active { background: #3a3a45; color: #fff; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+.tab-content pre { background: #0f0f13; border: 1px solid #2a2a35; border-radius: 6px; padding: 12px; font-size: 13px; line-height: 1.6; max-height: 400px; overflow-y: auto; white-space: pre-wrap; color: #d4d4d8; }
+
+.video-preview video { width: 100%; border-radius: 6px; max-height: 400px; background: #000; }
+
+/* 历史列表 */
+.history { max-width: 720px; margin: 32px auto 40px; padding: 0 20px; }
+.history h3 { font-size: 14px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+.history-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #1a1a23; border: 1px solid #2a2a35; border-radius: 8px; margin-bottom: 6px; cursor: pointer; transition: .2s; }
+.history-item:hover { border-color: #3a3a45; }
+.history-item .thumb { width: 48px; height: 48px; border-radius: 4px; object-fit: cover; background: #2a2a35; flex-shrink: 0; }
+.history-item .info { flex: 1; min-width: 0; }
+.history-item .info .title { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-item .info .author { font-size: 12px; color: #71717a; }
+.history-item .badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #2a2a35; color: #a1a1aa; white-space: nowrap; }
+.history-empty { padding: 40px; text-align: center; color: #52525b; }
+.btn-delete { padding: 4px 10px; font-size: 12px; background: none; border: 1px solid #3a3a45; color: #71717a; border-radius: 4px; cursor: pointer; }
+.btn-delete:hover { border-color: #ef4444; color: #ef4444; }
+
+/* toast */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1a23; border: 1px solid #2a2a35; border-radius: 8px; padding: 12px 20px; font-size: 14px; color: #e4e4e7; display: none; z-index: 999; max-width: 480px; text-align: center; }
+.toast.error { border-color: #ef4444; background: #1f0f0f; }
+.toast.show { display: block; animation: fadeIn .3s; }
+@keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📱 抖音<span>工作台</span></h1>
+  <div class="header-actions">
+    <button class="btn-config" onclick="location.href='/config'">⚙ 配置</button>
+  </div>
+</div>
+
+<!-- 输入 -->
+<div class="input-area">
+  <div class="input-row">
+    <input type="text" id="urlInput" placeholder="粘贴抖音分享链接，如 https://v.douyin.com/xxxxx/" autofocus>
+    <button class="btn-process" id="btnProcess" onclick="process()">开始处理</button>
+  </div>
+  <div class="input-hint">
+    <label><input type="checkbox" id="chkAsr" checked> 转写文案</label>
+    <label><input type="checkbox" id="chkSummary" checked> AI 总结</label>
+  </div>
+</div>
+
+<!-- 加载 -->
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div class="step" id="stepText">解析链接中…</div>
+</div>
+
+<!-- 结果 -->
+<div class="result" id="result">
+  <div class="result-card">
+    <h2 id="resTitle"></h2>
+    <div class="meta">
+      <span id="resAuthor"></span>
+      <span id="resLikes"></span>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="video" onclick="switchTab(this)">视频</button>
+      <button class="tab-btn" data-tab="transcript" onclick="switchTab(this)">完整文案</button>
+      <button class="tab-btn" data-tab="summary" onclick="switchTab(this)">AI 总结</button>
+      <button class="tab-btn" data-tab="vision" onclick="switchTab(this)">封面分析</button>
+    </div>
+    <div class="tab-content active" id="tab-video">
+      <div class="video-preview">
+        <video controls id="resVideo" src=""></video>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-transcript"><pre id="resTranscript">加载中…</pre></div>
+    <div class="tab-content" id="tab-summary"><pre id="resSummary">加载中…</pre></div>
+    <div class="tab-content" id="tab-vision"><pre id="resVision">加载中…</pre></div>
+  </div>
+</div>
+
+<!-- 历史 -->
+<div class="history">
+  <h3>📋 下载记录</h3>
+  <div id="historyList"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 处理链接 ──
+async function process() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return showToast('请粘贴抖音链接', 'error');
+
+  const btn = document.getElementById('btnProcess');
+  btn.disabled = true;
+  document.getElementById('loading').classList.add('active');
+  document.getElementById('result').classList.remove('active');
+  
+  const steps = ['解析链接中…', '下载视频中…', '转写文案中…', 'AI 总结中…', '即将完成…'];
+  let stepIdx = 0;
+  const stepTimer = setInterval(() => {
+    stepIdx = Math.min(stepIdx + 1, steps.length - 1);
+    document.getElementById('stepText').textContent = steps[stepIdx];
+  }, 5000);
+
+  try {
+    const resp = await fetch('/api/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: url,
+        asr: document.getElementById('chkAsr').checked,
+        summary: document.getElementById('chkSummary').checked
+      })
+    });
+    const data = await resp.json();
+    
+    clearInterval(stepTimer);
+    document.getElementById('loading').classList.remove('active');
+
+    if (data.error) {
+      showToast(data.error, 'error');
+      btn.disabled = false;
+      return;
+    }
+
+    // 显示结果
+    showResult(data);
+    loadHistory();
+    document.getElementById('urlInput').value = '';
+  } catch (e) {
+    clearInterval(stepTimer);
+    document.getElementById('loading').classList.remove('active');
+    showToast('网络错误: ' + e.message, 'error');
+  }
+  btn.disabled = false;
+}
+
+function showResult(data) {
+  const r = document.getElementById('result');
+  r.classList.add('active');
+
+  document.getElementById('resTitle').textContent = data.item?.title || '未知标题';
+  document.getElementById('resAuthor').textContent = '👤 ' + (data.item?.author || '');
+  document.getElementById('resLikes').textContent = '❤ ' + (data.item?.like_count || 0);
+
+  const videoPath = data.item?.video_path || '';
+  document.getElementById('resVideo').src = videoPath ? '/download/' + encodeURIComponent(videoPath.split('downloads/')[1] || '') : '';
+  document.getElementById('resTranscript').textContent = data.transcript || '(未转写)';
+  document.getElementById('resSummary').textContent = data.summary || '(未总结)';
+  document.getElementById('resVision').textContent = data.vision || '(未分析)';
+
+  // 默认选中视频 tab
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector('[data-tab="video"]').classList.add('active');
+  document.getElementById('tab-video').classList.add('active');
+}
+
+// ── Tab 切换 ──
+function switchTab(btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+}
+
+// ── 历史列表 ──
+async function loadHistory() {
+  try {
+    const resp = await fetch('/api/history');
+    const data = await resp.json();
+    const items = data.items || [];
+    const list = document.getElementById('historyList');
+    
+    if (items.length === 0) {
+      list.innerHTML = '<div class="history-empty">还没有任何处理记录</div>';
+      return;
+    }
+    
+    list.innerHTML = items.map(item => `
+      <div class="history-item" onclick="viewItem(${item.id})">
+        <img class="thumb" src="/download/${item.screenshot_path ? encodeURIComponent(item.screenshot_path.split('downloads/')[1]) : ''}" 
+             onerror="this.style.display='none'" alt="">
+        <div class="info">
+          <div class="title">${escapeHtml(item.title || '无标题')}</div>
+          <div class="author">${escapeHtml(item.author || '')} · ${fmtTime(item.created_at)}</div>
+        </div>
+        <span class="badge">${statusLabel(item.status)}</span>
+        <button class="btn-delete" onclick="event.stopPropagation(); deleteItem(${item.id})">删除</button>
+      </div>
+    `).join('');
+  } catch (e) {}
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text || '';
+  return div.innerHTML;
+}
+
+function statusLabel(status) {
+  const map = { parsed: '已解析', downloaded: '已下载', transcribed: '已转写', done: '已完成' };
+  return map[status] || status;
+}
+
+function fmtTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000);
+  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+async function viewItem(id) {
+  try {
+    const resp = await fetch('/api/item/' + id);
+    const data = await resp.json();
+    if (data.item) showResultFromDb(data.item);
+  } catch (e) {}
+}
+
+function showResultFromDb(item) {
+  document.getElementById('resTitle').textContent = item.title || '无标题';
+  document.getElementById('resAuthor').textContent = '👤 ' + (item.author || '');
+  document.getElementById('resLikes').textContent = '❤ ' + (item.like_count || 0);
+
+  const videoPath = item.video_path || '';
+  document.getElementById('resVideo').src = videoPath ? '/download/' + encodeURIComponent(videoPath.split('downloads/')[1] || '') : '';
+  document.getElementById('resTranscript').textContent = item.transcript || '(无文案)';
+  document.getElementById('resSummary').textContent = item.summary || '(无总结)';
+  document.getElementById('resVision').textContent = item.vision_analysis || '(未分析)';
+
+  document.getElementById('result').classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector('[data-tab="video"]').classList.add('active');
+  document.getElementById('tab-video').classList.add('active');
+}
+
+async function deleteItem(id) {
+  if (!confirm('确定删除这条记录？相关文件也会被清理。')) return;
+  await fetch('/api/item/' + id, { method: 'DELETE' });
+  loadHistory();
+}
+
+// ── Toast ──
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (type || '') + ' show';
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+// ── 回车键触发 ──
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') process();
+});
+
+// ── 启动加载 ──
+loadHistory();
+</script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>配置 - 抖音工作台</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f13; color: #e4e4e7; min-height: 100vh; }
+.header { background: #1a1a23; border-bottom: 1px solid #2a2a35; padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+.header h1 { font-size: 18px; font-weight: 600; color: #fff; }
+.header a { color: #a1a1aa; text-decoration: none; font-size: 14px; }
+.header a:hover { color: #fff; }
+.container { max-width: 640px; margin: 24px auto; padding: 0 20px; }
+.card { background: #1a1a23; border: 1px solid #2a2a35; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+.card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.card p { font-size: 12px; color: #71717a; margin-bottom: 12px; }
+label { display: block; font-size: 13px; color: #a1a1aa; margin-bottom: 4px; margin-top: 12px; }
+label:first-child { margin-top: 0; }
+input, select { width: 100%; padding: 10px 12px; background: #0f0f13; border: 1px solid #2a2a35; border-radius: 6px; color: #e4e4e7; font-size: 14px; outline: none; }
+input:focus { border-color: #ea580c; }
+select { cursor: pointer; }
+.hint { font-size: 11px; color: #52525b; margin-top: 4px; }
+.btn-save { padding: 10px 24px; background: #ea580c; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: .2s; display: block; margin-top: 20px; }
+.btn-save:hover { background: #d97706; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1a23; border: 1px solid #2a2a35; border-radius: 8px; padding: 12px 20px; font-size: 14px; display: none; z-index: 999; }
+.toast.show { display: block; }
+.divider { border: none; border-top: 1px solid #2a2a35; margin: 16px 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <a href="/">← 返回</a>
+  <h1>⚙ 配置</h1>
+</div>
+
+<div class="container">
+  <form id="configForm">
+    <!-- 大模型提供商 -->
+    <div class="card">
+      <h3>🤖 大模型</h3>
+      <p>选择 AI 提供商。Ollama 本地运行免费，需要先安装 Ollama；SiliconFlow 云端运行，需要 API Key。</p>
+      
+      <label>提供商</label>
+      <select id="llm_provider" onchange="toggleProvider()">
+        <option value="ollama">Ollama（本地）</option>
+        <option value="siliconflow">SiliconFlow（云端）</option>
+        <option value="openai">OpenAI（云端）</option>
+      </select>
+
+      <div id="ollamaConfig">
+        <label>Ollama 地址</label>
+        <input id="ollama_url" placeholder="http://localhost:11434">
+        <div class="hint">默认 http://localhost:11434，一般不需要改</div>
+        <label>文本模型</label>
+        <input id="text_model" placeholder="qwen2.5:7b">
+        <div class="hint">推荐 qwen2.5:7b 或 llama3.2:7b</div>
+        <label>视觉模型（封面分析）</label>
+        <input id="vision_model" placeholder="qwen2.5-vl:7b">
+        <div class="hint">推荐 qwen2.5-vl:7b 或 llava:7b，不支持就把vision_model留空</div>
+      </div>
+
+      <div id="cloudConfig" style="display:none">
+        <label>API Key</label>
+        <input id="cloud_api_key" type="password" placeholder="sk-xxx">
+        <div class="hint">SiliconFlow 免费额度：https://cloud.siliconflow.cn</div>
+      </div>
+    </div>
+
+    <!-- 语音识别 -->
+    <div class="card">
+      <h3>🎤 语音识别（ASR）</h3>
+      <p>将视频中的口播转写为文字。推荐 SiliconFlow（免费额度多）。</p>
+      <label>ASR 提供商</label>
+      <select id="asr_provider">
+        <option value="siliconflow">SiliconFlow（推荐）</option>
+        <option value="local_whisper">本地 Whisper（需 pip install openai-whisper）</option>
+      </select>
+      <div id="asrKeyConfig">
+        <label>API Key</label>
+        <input id="asr_api_key" type="password" placeholder="sk-xxx">
+        <div class="hint">如果和大模型用同一个 Key，填同一个</div>
+      </div>
+      <div id="asrWhisperConfig" style="display:none">
+        <label>Whisper 模型</label>
+        <select id="asr_whisper_model">
+          <option value="tiny">tiny（最快）</option>
+          <option value="base" selected>base（推荐）</option>
+          <option value="small">small</option>
+          <option value="medium">medium</option>
+        </select>
+      </div>
+    </div>
+
+    <button type="button" class="btn-save" onclick="saveConfig()">💾 保存配置</button>
+  </form>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const initialConfig = {{ config | tojson | safe }};
+
+function loadConfig() {
+  const llm = initialConfig.llm || {};
+  const asr = initialConfig.asr || {};
+  
+  document.getElementById('llm_provider').value = llm.provider || 'ollama';
+  document.getElementById('ollama_url').value = llm.ollama_url || 'http://localhost:11434';
+  document.getElementById('text_model').value = llm.text_model || 'qwen2.5:7b';
+  document.getElementById('vision_model').value = llm.vision_model || 'qwen2.5-vl:7b';
+  document.getElementById('cloud_api_key').value = llm.siliconflow_api_key || '';
+  document.getElementById('asr_provider').value = asr.provider || 'siliconflow';
+  document.getElementById('asr_api_key').value = asr.siliconflow_api_key || llm.siliconflow_api_key || '';
+  document.getElementById('asr_whisper_model').value = asr.model || 'base';
+  
+  toggleProvider();
+  toggleAsr();
+}
+
+function toggleProvider() {
+  const v = document.getElementById('llm_provider').value;
+  document.getElementById('ollamaConfig').style.display = v === 'ollama' ? 'block' : 'none';
+  document.getElementById('cloudConfig').style.display = v !== 'ollama' ? 'block' : 'none';
+}
+
+function toggleAsr() {
+  const v = document.getElementById('asr_provider').value;
+  document.getElementById('asrKeyConfig').style.display = v === 'siliconflow' ? 'block' : 'none';
+  document.getElementById('asrWhisperConfig').style.display = v === 'local_whisper' ? 'block' : 'none';
+}
+document.getElementById('asr_provider').addEventListener('change', toggleAsr);
+
+async function saveConfig() {
+  const provider = document.getElementById('llm_provider').value;
+  const payload = {
+    llm: {
+      provider: provider,
+      ollama_url: document.getElementById('ollama_url').value,
+      text_model: document.getElementById('text_model').value,
+      vision_model: document.getElementById('vision_model').value,
+      siliconflow_api_key: document.getElementById('cloud_api_key').value,
+      siliconflow_text_model: 'Qwen/Qwen3-8B',
+      siliconflow_vision_model: 'Qwen/Qwen2.5-VL-7B-Instruct',
+      openai_api_key: provider === 'openai' ? document.getElementById('cloud_api_key').value : '',
+      openai_text_model: 'gpt-4o-mini',
+      openai_vision_model: 'gpt-4o-mini'
+    },
+    asr: {
+      provider: document.getElementById('asr_provider').value,
+      siliconflow_api_key: document.getElementById('asr_api_key').value,
+      model: document.getElementById('asr_whisper_model').value
+    }
+  };
+
+  try {
+    const resp = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (data.status === 'ok') {
+      showToast('✅ 配置已保存');
+    }
+  } catch (e) {
+    showToast('❌ 保存失败: ' + e.message);
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+loadConfig();
+</script>
+</body>
+</html>
