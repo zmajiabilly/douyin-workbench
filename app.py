@@ -1,157 +1,253 @@
-"""抖音工作台 — Flask 后端"""
-import os, sys, yaml, time, json
+"""抖音工作台 — Flask 入口"""
+import os
+import threading
+import time
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_from_directory, Response
 
-# 确保模块路径正确
-sys.path.insert(0, str(Path(__file__).parent))
+import yaml
+from flask import Flask, jsonify, request, send_from_directory, render_template
 
-from pipeline import db, douyin, asr as asr_mod, llm as llm_mod
+from douyin_pipeline import parser, downloader, asr, llm
+from db import get_db, add_item, update_item, get_item, get_items, delete_item
 
 app = Flask(__name__)
 
-# ── 加载配置 ──
 CONFIG_PATH = Path(__file__).parent / "config.yaml"
+DATA_DIR = Path(__file__).parent / "data" / "downloads"
 
-def load_config():
-    if CONFIG_PATH.exists():
-        with open(CONFIG_PATH, encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
-    return {"llm": {"provider": "siliconflow"}, "asr": {}}
 
-def save_config(cfg):
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        yaml.dump(cfg, f, allow_unicode=True, default_flow_style=False)
+def _load_config():
+    with open(CONFIG_PATH, encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
-# ── 页面路由 ──
+
+# ── Pages ──────────────────────────────────────────────
+
 @app.route("/")
 def index():
     return render_template("index.html")
 
-# ── 配置页面 ──
+
 @app.route("/config")
 def config_page():
-    return render_template("config.html", config=load_config())
+    return render_template("config.html")
+
+
+# ── Config API ─────────────────────────────────────────
 
 @app.route("/api/config", methods=["GET"])
 def get_config():
-    return jsonify(load_config())
+    cfg = _load_config()
+    # 脱敏：返回时隐藏完整 key，只显示前后 4 位
+    for section in ("llm", "asr"):
+        for key in list(cfg.get(section, {})):
+            val = cfg[section].get(key, "")
+            if "key" in key.lower() and val:
+                cfg[section][key] = val[:4] + "****" + val[-4:]
+    return jsonify(cfg)
+
 
 @app.route("/api/config", methods=["POST"])
-def update_config():
-    cfg = load_config()
-    data = request.get_json()
-    # 更新 llm
-    if "llm" in data:
-        cfg.setdefault("llm", {}).update(data["llm"])
-    if "asr" in data:
-        cfg.setdefault("asr", {}).update(data["asr"])
-    if "proxy" in data:
-        cfg.setdefault("proxy", {}).update(data["proxy"])
-    save_config(cfg)
-    return jsonify({"status": "ok", "config": cfg})
+def save_config():
+    data = request.get_json(force=True)
+    existing = _load_config()
 
-# ── 处理单条链接 ──
+    def _merge(section):
+        for key, val in data.get(section, {}).items():
+            # 如果传过来的是脱敏值，保留原值
+            if "key" in key.lower() and isinstance(val, str) and "****" in val:
+                continue
+            existing.setdefault(section, {})[key] = val
+
+    _merge("llm")
+    _merge("asr")
+
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        yaml.dump(existing, f, allow_unicode=True, sort_keys=False)
+    return jsonify({"ok": True})
+
+
+# ── Process ────────────────────────────────────────────
+
 @app.route("/api/process", methods=["POST"])
 def process():
-    data = request.get_json()
+    data = request.get_json(force=True)
     url = data.get("url", "").strip()
-    do_asr = data.get("asr", True)       # 是否做语音转写
-    do_summary = data.get("summary", True)  # 是否做 AI 总结
-    
+    asr_enabled = data.get("asr", True)
+    summary_enabled = data.get("summary", True)
+
     if not url:
         return jsonify({"error": "请输入抖音链接"}), 400
-    if "douyin.com" not in url and "iesdouyin.com" not in url:
-        return jsonify({"error": "请输入有效的抖音链接"}), 400
-    
-    config = load_config()
-    
-    try:
-        # 1. 解析页面
-        info = douyin.parse_url(url)
-        
-        # 2. 写入数据库
-        item = db.add_item(
-            info["video_id"], url,
-            title=info["title"],
-            author=info["author"],
-            like_count=info.get("like_count", 0)
-        )
-        
-        # 3. 下载视频 + 音频 + 封面
-        files = douyin.download_video(info)
-        db.update_item(info["video_id"], **files, status="downloaded")
-        
-        result = {
-            "status": "ok",
-            "item": {**info, **files}
-        }
-        
-        # 4. ASR 转写
-        if do_asr and files.get("audio_path"):
-            transcript = asr_mod.transcribe(files["audio_path"], config)
-            db.update_item(info["video_id"], transcript=transcript, status="transcribed")
-            result["transcript"] = transcript
-        else:
-            transcript = ""
-            result["transcript"] = ""
-        
-        # 5. LLM 总结
-        if do_summary and transcript and not transcript.startswith("("):
-            summary = llm_mod.summarize(transcript, config)
-            db.update_item(info["video_id"], summary=summary, status="done")
-            result["summary"] = summary
-        
-        # 6. 视觉分析封面
-        if do_summary and files.get("screenshot_path"):
-            vision = llm_mod.analyze_cover(files["screenshot_path"], config)
-            result["vision"] = vision
-        
-        result["status"] = "done"
-        return jsonify(result)
-    
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        return jsonify({"error": f"处理失败: {str(e)}"}), 500
 
-# ── 历史列表 ──
+    config = _load_config()
+
+    def _run(video_id):
+        try:
+            update_item(video_id, status="parsing")
+            info = parser.parse_url(url)
+
+            add_item(
+                video_id=info.get("video_id", video_id),
+                url=url,
+                title=info.get("title", ""),
+                author=info.get("author", ""),
+                like_count=info.get("like_count", 0),
+            )
+
+            vid = info.get("video_id", video_id)
+
+            update_item(vid, status="downloading")
+            files = downloader.download_video(info, data_dir=DATA_DIR)
+            update_item(vid,
+                        video_path=files["video_path"],
+                        audio_path=files["audio_path"],
+                        screenshot_path=files["screenshot_path"],
+                        status="downloaded")
+
+            if asr_enabled and files.get("audio_path"):
+                update_item(vid, status="transcribing")
+                transcript = asr.transcribe(files["audio_path"], config)
+                update_item(vid, transcript=transcript, status="transcribed")
+
+            if summary_enabled:
+                update_item(vid, status="summarizing")
+                row = get_item_by_video_id(vid)
+                text_to_summarize = (row or {}).get("transcript", "")
+                if text_to_summarize and not text_to_summarize.startswith("("):
+                    summary_text = llm.summarize(text_to_summarize, config)
+                    update_item(vid, summary=summary_text)
+                if files.get("screenshot_path"):
+                    cover_analysis = llm.analyze_cover(files["screenshot_path"], config)
+                    existing_tags = ""
+                    row2 = get_item_by_video_id(vid)
+                    if row2:
+                        existing_tags = row2.get("tags", "") or ""
+                    tags = existing_tags + (" | " + cover_analysis[:100] if existing_tags else cover_analysis[:100])
+                    update_item(vid, tags=tags)
+
+            update_item(vid, status="done")
+        except Exception as e:
+            try:
+                update_item(video_id, status=f"error: {str(e)[:200]}")
+            except Exception:
+                pass
+
+    # 从短链接解析 video_id 用于追踪
+    try:
+        info = parser.parse_url(url)
+        video_id = info.get("video_id", str(time.time()))
+    except Exception:
+        video_id = str(time.time())
+
+    add_item(video_id=video_id, url=url)
+    threading.Thread(target=_run, args=(video_id,), daemon=True).start()
+
+    return jsonify({"video_id": video_id}), 202
+
+
+def get_item_by_video_id(video_id):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM items WHERE video_id=?", (video_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+# ── History ────────────────────────────────────────────
+
 @app.route("/api/history")
 def history():
-    items = db.get_items(limit=100)
-    return jsonify({"items": items})
+    items = get_items(limit=200)
+    return jsonify(items)
+
 
 @app.route("/api/item/<int:item_id>")
 def item_detail(item_id):
-    item = db.get_item(item_id)
+    item = get_item(item_id)
     if not item:
-        return jsonify({"error": "不存在"}), 404
-    return jsonify({"item": item})
+        return jsonify({"error": "not found"}), 404
+    return jsonify(item)
+
 
 @app.route("/api/item/<int:item_id>", methods=["DELETE"])
 def item_delete(item_id):
-    item = db.get_item(item_id)
+    item = get_item(item_id)
     if item:
-        # 清理文件
-        for key in ("video_path", "audio_path", "screenshot_path"):
-            p = item.get(key)
+        for path_key in ("video_path", "audio_path", "screenshot_path"):
+            p = item.get(path_key)
             if p and Path(p).exists():
-                Path(p).unlink(missing_ok=True)
-        db.delete_item(item_id)
-    return jsonify({"status": "ok"})
+                try:
+                    Path(p).unlink()
+                except OSError:
+                    pass
+    delete_item(item_id)
+    return jsonify({"ok": True})
 
-# ── 静态文件下载 ──
+
+# ── Export ─────────────────────────────────────────────
+
+@app.route("/api/export")
+def export_excel():
+    from openpyxl import Workbook
+
+    items = _get_all_items()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "抖音素材"
+    headers = ["标题", "原始链接", "作者", "点赞量", "视频创建时间", "下载时间",
+               "标签", "内容总结", "AI总结"]
+    ws.append(headers)
+
+    for item in items:
+        ws.append([
+            item.get("title", ""),
+            item.get("url", ""),
+            item.get("author", ""),
+            item.get("like_count", 0),
+            _fmt_time(item.get("created_at")),
+            _fmt_time(item.get("updated_at")),
+            item.get("tags", ""),
+            item.get("transcript", ""),
+            item.get("summary", ""),
+        ])
+
+    import io
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue(), 200, {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": "attachment; filename=douyin_export.xlsx",
+    }
+
+
+def _get_all_items():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM items ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def _fmt_time(ts):
+    if not ts:
+        return ""
+    import datetime
+    return datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
+
+
+# ── Static files ───────────────────────────────────────
+
 @app.route("/download/<path:filename>")
 def download_file(filename):
-    return send_from_directory(str(Path(__file__).parent / "data" / "downloads"), filename)
+    return send_from_directory(str(DATA_DIR), filename)
 
-# ── 启动 ──
+
+# ── Startup ────────────────────────────────────────────
+
 if __name__ == "__main__":
-    import webbrowser
-    print("=" * 45)
-    print("  抖音工作台已启动")
-    print(f"  打开浏览器访问：http://127.0.0.1:8650")
-    print("  Ctrl+C 停止服务")
-    print("=" * 45)
-    webbrowser.open("http://127.0.0.1:8650")
+    # 确保下载目录存在
+    for sub in ("videos", "audio", "screenshots"):
+        (DATA_DIR / sub).mkdir(parents=True, exist_ok=True)
+
+    print("🚀 抖音工作台启动: http://127.0.0.1:8650")
     app.run(host="127.0.0.1", port=8650, debug=False)
