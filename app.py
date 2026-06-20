@@ -17,7 +17,7 @@ def load_config():
     if CONFIG_PATH.exists():
         with open(CONFIG_PATH, encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
-    return {}
+    return {"llm": {"provider": "siliconflow"}, "asr": {}}
 
 def save_config(cfg):
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:

@@ -40,57 +40,34 @@ select { cursor: pointer; }
     <!-- 大模型提供商 -->
     <div class="card">
       <h3>🤖 大模型</h3>
-      <p>选择 AI 提供商。Ollama 本地运行免费，需要先安装 Ollama；SiliconFlow 云端运行，需要 API Key。</p>
+      <p>全部走云端大模型，填一个 API Key 即可使用。推荐 SiliconFlow（免费额度多）。</p>
       
       <label>提供商</label>
       <select id="llm_provider" onchange="toggleProvider()">
-        <option value="ollama">Ollama（本地）</option>
-        <option value="siliconflow">SiliconFlow（云端）</option>
-        <option value="openai">OpenAI（云端）</option>
+        <option value="siliconflow">SiliconFlow（推荐）</option>
+        <option value="openai">OpenAI</option>
       </select>
 
-      <div id="ollamaConfig">
-        <label>Ollama 地址</label>
-        <input id="ollama_url" placeholder="http://localhost:11434">
-        <div class="hint">默认 http://localhost:11434，一般不需要改</div>
-        <label>文本模型</label>
-        <input id="text_model" placeholder="qwen2.5:7b">
-        <div class="hint">推荐 qwen2.5:7b 或 llama3.2:7b</div>
-        <label>视觉模型（封面分析）</label>
-        <input id="vision_model" placeholder="qwen2.5-vl:7b">
-        <div class="hint">推荐 qwen2.5-vl:7b 或 llava:7b，不支持就把vision_model留空</div>
-      </div>
-
-      <div id="cloudConfig" style="display:none">
+      <div id="cloudConfig">
         <label>API Key</label>
         <input id="cloud_api_key" type="password" placeholder="sk-xxx">
-        <div class="hint">SiliconFlow 免费额度：https://cloud.siliconflow.cn</div>
+        <div class="hint">免费获取：https://cloud.siliconflow.cn → 注册 → 创建 API Key</div>
+      </div>
+      <div id="modelConfig" style="margin-top:12px; display:none;">
+        <label>文本模型</label>
+        <input id="text_model" placeholder="Qwen/Qwen3-8B">
+        <label>视觉模型</label>
+        <input id="vision_model" placeholder="Qwen/Qwen2.5-VL-7B-Instruct">
       </div>
     </div>
 
     <!-- 语音识别 -->
     <div class="card">
       <h3>🎤 语音识别（ASR）</h3>
-      <p>将视频中的口播转写为文字。推荐 SiliconFlow（免费额度多）。</p>
-      <label>ASR 提供商</label>
-      <select id="asr_provider">
-        <option value="siliconflow">SiliconFlow（推荐）</option>
-        <option value="local_whisper">本地 Whisper（需 pip install openai-whisper）</option>
-      </select>
-      <div id="asrKeyConfig">
-        <label>API Key</label>
-        <input id="asr_api_key" type="password" placeholder="sk-xxx">
-        <div class="hint">如果和大模型用同一个 Key，填同一个</div>
-      </div>
-      <div id="asrWhisperConfig" style="display:none">
-        <label>Whisper 模型</label>
-        <select id="asr_whisper_model">
-          <option value="tiny">tiny（最快）</option>
-          <option value="base" selected>base（推荐）</option>
-          <option value="small">small</option>
-          <option value="medium">medium</option>
-        </select>
-      </div>
+      <p>将视频中的口播转写为文字。默认用 SiliconFlow SenseVoice，和新用户免费额度。</p>
+      <label>API Key</label>
+      <input id="asr_api_key" type="password" placeholder="sk-xxx">
+      <div class="hint">和大模型用同一个 Key 即可</div>
     </div>
 
     <button type="button" class="btn-save" onclick="saveConfig()">💾 保存配置</button>
@@ -106,51 +83,35 @@ function loadConfig() {
   const llm = initialConfig.llm || {};
   const asr = initialConfig.asr || {};
   
-  document.getElementById('llm_provider').value = llm.provider || 'ollama';
-  document.getElementById('ollama_url').value = llm.ollama_url || 'http://localhost:11434';
-  document.getElementById('text_model').value = llm.text_model || 'qwen2.5:7b';
-  document.getElementById('vision_model').value = llm.vision_model || 'qwen2.5-vl:7b';
+  document.getElementById('llm_provider').value = llm.provider || 'siliconflow';
   document.getElementById('cloud_api_key').value = llm.siliconflow_api_key || '';
-  document.getElementById('asr_provider').value = asr.provider || 'siliconflow';
+  document.getElementById('text_model').value = llm.siliconflow_text_model || 'Qwen/Qwen3-8B';
+  document.getElementById('vision_model').value = llm.siliconflow_vision_model || 'Qwen/Qwen2.5-VL-7B-Instruct';
   document.getElementById('asr_api_key').value = asr.siliconflow_api_key || llm.siliconflow_api_key || '';
-  document.getElementById('asr_whisper_model').value = asr.model || 'base';
   
   toggleProvider();
-  toggleAsr();
 }
 
 function toggleProvider() {
   const v = document.getElementById('llm_provider').value;
-  document.getElementById('ollamaConfig').style.display = v === 'ollama' ? 'block' : 'none';
-  document.getElementById('cloudConfig').style.display = v !== 'ollama' ? 'block' : 'none';
+  document.getElementById('cloudConfig').style.display = 'block';
+  document.getElementById('modelConfig').style.display = 'none';
 }
-
-function toggleAsr() {
-  const v = document.getElementById('asr_provider').value;
-  document.getElementById('asrKeyConfig').style.display = v === 'siliconflow' ? 'block' : 'none';
-  document.getElementById('asrWhisperConfig').style.display = v === 'local_whisper' ? 'block' : 'none';
-}
-document.getElementById('asr_provider').addEventListener('change', toggleAsr);
 
 async function saveConfig() {
   const provider = document.getElementById('llm_provider').value;
   const payload = {
     llm: {
       provider: provider,
-      ollama_url: document.getElementById('ollama_url').value,
-      text_model: document.getElementById('text_model').value,
-      vision_model: document.getElementById('vision_model').value,
       siliconflow_api_key: document.getElementById('cloud_api_key').value,
-      siliconflow_text_model: 'Qwen/Qwen3-8B',
-      siliconflow_vision_model: 'Qwen/Qwen2.5-VL-7B-Instruct',
+      siliconflow_text_model: document.getElementById('text_model').value,
+      siliconflow_vision_model: document.getElementById('vision_model').value,
       openai_api_key: provider === 'openai' ? document.getElementById('cloud_api_key').value : '',
       openai_text_model: 'gpt-4o-mini',
       openai_vision_model: 'gpt-4o-mini'
     },
     asr: {
-      provider: document.getElementById('asr_provider').value,
-      siliconflow_api_key: document.getElementById('asr_api_key').value,
-      model: document.getElementById('asr_whisper_model').value
+      siliconflow_api_key: document.getElementById('asr_api_key').value
     }
   };
 

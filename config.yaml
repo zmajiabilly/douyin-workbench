@@ -2,17 +2,12 @@
 # 抖音工作台 - 配置文件
 # ═══════════════════════════════════════════
 
-# 大模型配置（Ollama 本地 / SiliconFlow 云端 二选一）
+# 大模型配置（默认用 SiliconFlow 云端，免费额度够用）
 llm:
-  provider: ollama          # ollama | siliconflow | openai
+  provider: siliconflow       # siliconflow | openai
 
-  # --- Ollama（本地，免费，需要先装 Ollama）---
-  ollama_url: http://localhost:11434
-  text_model: qwen2.5:7b      # 文本模型
-  vision_model: qwen2.5-vl:7b # 视觉模型（分析封面/截图）
-
-  # --- SiliconFlow（云端，需要 API Key）---
-  siliconflow_api_key: ""
+  # --- SiliconFlow（云端，需要 API Key，免费额度多）---
+  siliconflow_api_key: ""     # ← 在这里填你的 API Key
   siliconflow_text_model: Qwen/Qwen3-8B
   siliconflow_vision_model: Qwen/Qwen2.5-VL-7B-Instruct
 
@@ -21,16 +16,7 @@ llm:
   openai_text_model: gpt-4o-mini
   openai_vision_model: gpt-4o-mini
 
-# 语音识别配置（转录口播文案）
+# 语音识别配置（转录口播文案，默认 SiliconFlow）
 asr:
-  provider: siliconflow       # siliconflow（推荐，免费额度多）
-  siliconflow_api_key: ""     # 和上面对话框内容相同，填一个
-  # 如果要用本地 Whisper，先 pip install openai-whisper，然后改这里：
-  # provider: local_whisper
-  # model: base
-
-# 代理（一般不需要，抓自己看到的视频）
-proxy:
-  enabled: false
-  http: ""
-  https: ""
+  provider: siliconflow
+  siliconflow_api_key: ""     # 和上面同一个 Key 就行
