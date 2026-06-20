@@ -86,15 +86,12 @@ def process():
             update_item(video_id, status="parsing")
             info = parser.parse_url(url)
 
-            add_item(
-                video_id=info.get("video_id", video_id),
-                url=url,
+            vid = info.get("video_id", video_id)
+
+            update_item(vid,
                 title=info.get("title", ""),
                 author=info.get("author", ""),
-                like_count=info.get("like_count", 0),
-            )
-
-            vid = info.get("video_id", video_id)
+                like_count=info.get("like_count", 0))
 
             update_item(vid, status="downloading")
             files = downloader.download_video(info, data_dir=DATA_DIR)
