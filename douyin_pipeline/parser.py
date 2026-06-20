@@ -2,7 +2,7 @@
 
 使用 douyin-mcp-server 库，视频解析无需 API Key，文案提取需要 SiliconFlow Key。
 """
-from douyin_mcp_server import parse_douyin_video_info, extract_douyin_text
+from douyin_mcp_server import parse_douyin_video_info
 
 
 def parse_url(share_url):
