@@ -221,7 +221,7 @@ td .actions button {
 <!-- ── Top Bar ───────────────────────────── -->
 <div class="topbar">
   <h1>📱 抖音工作台</h1>
-  <button class="config-btn" onclick="location.href='/config'">⚙ 配置</button>
+  <button class="config-btn" onclick="location.href='config'">⚙ 配置</button>
 </div>
 
 <!-- ── Tab Bar ────────────────────────────── -->
@@ -365,7 +365,7 @@ function startProcess() {
   // Reset polling
   if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
 
-  fetch('/api/process', {
+  fetch('api/process', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url, asr, summary })
@@ -392,7 +392,7 @@ function startProcess() {
 }
 
 function pollStatus(videoId) {
-  fetch('/api/history')
+  fetch('api/history')
     .then(r => r.json())
     .then(items => {
       const item = items.find(i => i.video_id === videoId);
@@ -493,7 +493,7 @@ function switchCardTab(name) {
    History
    ════════════════════════════════════════════════════════ */
 function fetchHistory() {
-  fetch('/api/history')
+  fetch('api/history')
     .then(r => r.json())
     .then(items => {
       historyData = items;
@@ -641,7 +641,7 @@ function showItemDetail(itemId) {
 
 function deleteItem(id) {
   if (!confirm('确定要删除这条记录吗？相关的本地文件也将被删除。')) return;
-  fetch('/api/item/' + id, { method: 'DELETE' })
+  fetch('api/item/' + id, { method: 'DELETE' })
     .then(r => r.json())
     .then(data => {
       if (data.ok) {
@@ -655,7 +655,7 @@ function deleteItem(id) {
 }
 
 function exportExcel() {
-  window.location.href = '/api/export';
+  window.location.href = 'api/export';
 }
 
 /* ════════════════════════════════════════════════════════

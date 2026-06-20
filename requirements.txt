@@ -2,4 +2,3 @@ flask>=3.0
 requests>=2.31
 pyyaml>=6.0
 openpyxl>=3.1
-douyin-mcp-server>=0.1

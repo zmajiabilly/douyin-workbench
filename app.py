@@ -1,4 +1,6 @@
 """抖音工作台 — Flask 入口"""
+import datetime
+import io
 import os
 import threading
 import time
@@ -8,7 +10,7 @@ import yaml
 from flask import Flask, jsonify, request, send_from_directory, render_template
 
 from douyin_pipeline import parser, downloader, asr, llm
-from db import get_db, add_item, update_item, get_item, get_items, delete_item
+from db import add_item, update_item, get_item, get_items, get_item_by_video_id, get_all_items, delete_item
 
 app = Flask(__name__)
 
@@ -137,13 +139,6 @@ def process():
     return jsonify({"video_id": video_id}), 202
 
 
-def get_item_by_video_id(video_id):
-    conn = get_db()
-    row = conn.execute("SELECT * FROM items WHERE video_id=?", (video_id,)).fetchone()
-    conn.close()
-    return dict(row) if row else None
-
-
 # ── History ────────────────────────────────────────────
 
 @app.route("/api/history")
@@ -181,7 +176,7 @@ def item_delete(item_id):
 def export_excel():
     from openpyxl import Workbook
 
-    items = _get_all_items()
+    items = get_all_items()
 
     wb = Workbook()
     ws = wb.active
@@ -223,7 +218,6 @@ def _get_all_items():
 def _fmt_time(ts):
     if not ts:
         return ""
-    import datetime
     return datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
 
 

@@ -1,9 +1,18 @@
+# 本地配置（含 API Key，永不提交）
+config.yaml
+config.local.yaml
+
+# 数据文件
+*.db
+data/downloads/
+
+# Python
 __pycache__/
 *.pyc
-.env
-data/database.db
-data/downloads/videos/*
-data/downloads/audio/*
-data/downloads/screenshots/*
-!data/downloads/*/.gitkeep
+.venv/
+venv/
+*.egg-info/
+
+# 系统
 .DS_Store
+Thumbs.db

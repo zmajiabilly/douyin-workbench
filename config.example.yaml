@@ -1,22 +1,21 @@
 # ═══════════════════════════════════════════
-# 抖音工作台 - 配置文件
+# 抖音工作台 - 配置文件模板
+# ═══════════════════════════════════════════
+# 使用方式：
+#   Windows: copy config.example.yaml config.yaml
+#   Mac/Linux: cp config.example.yaml config.yaml
+#   然后在网页「⚙ 配置」页填写 API Key
 # ═══════════════════════════════════════════
 
-# 大模型配置（默认用 SiliconFlow 云端，免费额度够用）
 llm:
-  provider: siliconflow       # siliconflow | openai
-
-  # --- SiliconFlow（云端，需要 API Key，免费额度多）---
+  provider: siliconflow
   siliconflow_api_key: ""
   siliconflow_text_model: Qwen/Qwen3-8B
-  siliconflow_vision_model: Qwen/Qwen2.5-VL-7B-Instruct
-
-  # --- OpenAI（云端，需要 API Key）---
+  siliconflow_vision_model: Qwen/Qwen3-VL-8B-Instruct
   openai_api_key: ""
   openai_text_model: gpt-4o-mini
   openai_vision_model: gpt-4o-mini
 
-# 语音识别配置（转录口播文案，默认 SiliconFlow）
 asr:
   provider: siliconflow
   siliconflow_api_key: ""

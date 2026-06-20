@@ -1,14 +1,28 @@
-"""大模型 — 文案总结 + 视觉分析（仅云端）"""
-import requests, base64
+"""大模型 — 文案总结 + 封面视觉分析（云端）
+
+同时支持 SiliconFlow 和 OpenAI 接口。
+"""
+import base64
+
+import requests
+
 
 def summarize(transcript, config):
-    """用大模型总结口播文案"""
+    """用大模型总结口播文案
+
+    Args:
+        transcript: ASR 转写文案
+        config: 配置字典（llm.provider, llm.*_api_key, llm.*_model）
+
+    Returns:
+        str: Markdown 格式总结，失败时返回以 ( 开头的错误信息
+    """
     if not transcript or transcript.startswith("("):
         return transcript
-    
+
     llm = config.get("llm", {})
     provider = llm.get("provider", "siliconflow")
-    
+
     prompt = (
         "你是一个内容分析专家。请对以下抖音口播文案进行结构化总结，要求：\n"
         "1. 用 ## 分二级章节（核心观点、具体方法、案例、数据等）\n"
@@ -17,64 +31,68 @@ def summarize(transcript, config):
         "4. 保持客观，不评价好坏\n\n"
         f"文案：\n{transcript[:8000]}"
     )
-    
+
     if provider == "siliconflow":
         return _siliconflow_chat(
             llm.get("siliconflow_api_key", ""),
             llm.get("siliconflow_text_model", "Qwen/Qwen3-8B"),
-            prompt
+            prompt,
         )
     elif provider == "openai":
         return _openai_chat(
             llm.get("openai_api_key", ""),
             llm.get("openai_text_model", "gpt-4o-mini"),
-            prompt
+            prompt,
         )
     return "(请在 config.yaml 中配置大模型)"
 
+
 def analyze_cover(image_path, config):
-    """用视觉模型分析封面/截图"""
+    """用视觉模型分析封面/截图
+
+    Args:
+        image_path: 图片文件路径
+        config: 配置字典（llm.provider, llm.*_api_key, llm.*_vision_model）
+
+    Returns:
+        str: 分析结果文本，失败时返回以 ( 开头的错误信息
+    """
     llm = config.get("llm", {})
     provider = llm.get("provider", "siliconflow")
-    
+
     prompt = "请分析这张图片的内容：画面里有什么、文字写了什么、整体风格如何。"
-    
+
     if provider == "siliconflow":
         return _siliconflow_vision(
             llm.get("siliconflow_api_key", ""),
-            llm.get("siliconflow_vision_model", "Qwen/Qwen2.5-VL-7B-Instruct"),
-            image_path, prompt
+            llm.get("siliconflow_vision_model", "Qwen/Qwen3-VL-8B-Instruct"),
+            image_path, prompt,
         )
     elif provider == "openai":
         return _openai_vision(
             llm.get("openai_api_key", ""),
             llm.get("openai_vision_model", "gpt-4o-mini"),
-            image_path, prompt
+            image_path, prompt,
         )
     return "(视觉分析需要配置 vision_model)"
+
 
 def _siliconflow_chat(api_key, model, prompt):
     if not api_key:
         return "(未配置 API Key)"
     resp = requests.post(
         "https://api.siliconflow.cn/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.3,
-            "max_tokens": 2048
-        },
-        timeout=120
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"model": model, "messages": [{"role": "user", "content": prompt}],
+              "temperature": 0.3, "max_tokens": 2048},
+        timeout=120,
     )
     if resp.status_code == 200:
         return resp.json()["choices"][0]["message"]["content"]
     if resp.status_code == 401:
         return "(API Key 无效)"
     return f"(API 错误: HTTP {resp.status_code})"
+
 
 def _siliconflow_vision(api_key, model, image_path, prompt):
     if not api_key:
@@ -83,49 +101,40 @@ def _siliconflow_vision(api_key, model, image_path, prompt):
         img_b64 = base64.b64encode(f.read()).decode()
     resp = requests.post(
         "https://api.siliconflow.cn/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        },
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         json={
             "model": model,
             "messages": [{
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {
-                        "url": f"data:image/jpeg;base64,{img_b64}"
-                    }}
-                ]
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}},
+                ],
             }],
             "temperature": 0.3,
-            "max_tokens": 1024
+            "max_tokens": 1024,
         },
-        timeout=120
+        timeout=120,
     )
     if resp.status_code == 200:
         return resp.json()["choices"][0]["message"]["content"]
     return f"(视觉 API 错误: HTTP {resp.status_code})"
+
 
 def _openai_chat(api_key, model, prompt):
     if not api_key:
         return "(未配置 API Key)"
     resp = requests.post(
         "https://api.openai.com/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.3
-        },
-        timeout=120
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"model": model, "messages": [{"role": "user", "content": prompt}],
+              "temperature": 0.3},
+        timeout=120,
     )
     if resp.status_code == 200:
         return resp.json()["choices"][0]["message"]["content"]
     return f"(API 错误: HTTP {resp.status_code})"
+
 
 def _openai_vision(api_key, model, image_path, prompt):
     if not api_key:
@@ -134,25 +143,20 @@ def _openai_vision(api_key, model, image_path, prompt):
         img_b64 = base64.b64encode(f.read()).decode()
     resp = requests.post(
         "https://api.openai.com/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        },
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         json={
             "model": model,
             "messages": [{
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {
-                        "url": f"data:image/jpeg;base64,{img_b64}"
-                    }}
-                ]
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}},
+                ],
             }],
             "temperature": 0.3,
-            "max_tokens": 1024
+            "max_tokens": 1024,
         },
-        timeout=120
+        timeout=120,
     )
     if resp.status_code == 200:
         return resp.json()["choices"][0]["message"]["content"]

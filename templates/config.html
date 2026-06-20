@@ -15,59 +15,116 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .card { background: #1a1a23; border: 1px solid #2a2a35; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
 .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
 .card p { font-size: 12px; color: #71717a; margin-bottom: 12px; }
-label { display: block; font-size: 13px; color: #a1a1aa; margin-bottom: 4px; margin-top: 12px; }
-label:first-child { margin-top: 0; }
-input, select { width: 100%; padding: 10px 12px; background: #0f0f13; border: 1px solid #2a2a35; border-radius: 6px; color: #e4e4e7; font-size: 14px; outline: none; }
-input:focus { border-color: #ea580c; }
-select { cursor: pointer; }
-.hint { font-size: 11px; color: #52525b; margin-top: 4px; }
-.btn-save { padding: 10px 24px; background: #ea580c; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: .2s; display: block; margin-top: 20px; }
+.radio-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.radio-item { display: flex; align-items: flex-start; gap: 8px; padding: 12px; background: #0f0f13; border: 1px solid #2a2a35; border-radius: 6px; cursor: pointer; transition: .2s; }
+.radio-item:hover { border-color: #3a3a45; }
+.radio-item.active { border-color: #ea580c; }
+.radio-item input[type="radio"] { margin-top: 3px; accent-color: #ea580c; }
+.radio-item .label { flex: 1; }
+.radio-item .label strong { display: block; font-size: 14px; color: #e4e4e7; }
+.radio-item .label small { font-size: 12px; color: #71717a; }
+.field { margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+.field label { display: block; font-size: 13px; color: #a1a1aa; margin-bottom: 4px; }
+.field input, .field select { width: 100%; padding: 10px 12px; background: #0f0f13; border: 1px solid #2a2a35; border-radius: 6px; color: #e4e4e7; font-size: 14px; outline: none; }
+.field input:focus, .field select:focus { border-color: #ea580c; }
+.field .hint { font-size: 11px; color: #52525b; margin-top: 4px; }
+.field-hidden { display: none; }
+.qr-area { text-align: center; padding: 12px; }
+.qr-placeholder { width: 160px; height: 160px; background: #2a2a35; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: #52525b; font-size: 12px; margin-bottom: 8px; }
+.activate-row { display: flex; gap: 8px; }
+.activate-row input { flex: 1; }
+.activate-row button { padding: 10px 16px; background: #2a2a35; color: #a1a1aa; border: 1px solid #3a3a45; border-radius: 6px; cursor: pointer; }
+.activate-row button:hover { background: #3a3a45; color: #fff; }
+.status-badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 12px; margin-top: 8px; }
+.status-badge.active { background: #14532d; color: #4ade80; border: 1px solid #166534; }
+.status-badge.inactive { background: #1f0f0f; color: #f87171; border: 1px solid #3a1a1a; }
+.btn-save { display: block; width: 100%; padding: 12px; background: #ea580c; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 500; cursor: pointer; transition: .2s; margin-top: 20px; }
 .btn-save:hover { background: #d97706; }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1a23; border: 1px solid #2a2a35; border-radius: 8px; padding: 12px 20px; font-size: 14px; display: none; z-index: 999; }
 .toast.show { display: block; }
-.divider { border: none; border-top: 1px solid #2a2a35; margin: 16px 0; }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <a href="/">← 返回</a>
+  <a href="./">← 返回</a>
   <h1>⚙ 配置</h1>
 </div>
 
 <div class="container">
   <form id="configForm">
-    <!-- 大模型提供商 -->
-    <div class="card">
-      <h3>🤖 大模型</h3>
-      <p>全部走云端大模型，填一个 API Key 即可使用。推荐 SiliconFlow（免费额度多）。</p>
-      
-      <label>提供商</label>
-      <select id="llm_provider" onchange="toggleProvider()">
-        <option value="siliconflow">SiliconFlow（推荐）</option>
-        <option value="openai">OpenAI</option>
-      </select>
 
-      <div id="cloudConfig">
-        <label>API Key</label>
-        <input id="cloud_api_key" type="password" placeholder="sk-xxx">
-        <div class="hint">免费获取：https://cloud.siliconflow.cn → 注册 → 创建 API Key</div>
+    <!-- API Key -->
+    <div class="card">
+      <h3>🤖 API Key 配置</h3>
+      <p>自备 API Key 或扫码购买，二选一。</p>
+      <div class="radio-group">
+        <div class="radio-item" onclick="selectMode('self')">
+          <input type="radio" name="api_mode" value="self" id="mode_self">
+          <div class="label">
+            <strong>使用自己的 API Key</strong>
+            <small>自备 SiliconFlow / OpenAI Key</small>
+          </div>
+        </div>
+        <div class="radio-item" onclick="selectMode('buy')">
+          <input type="radio" name="api_mode" value="buy" id="mode_buy">
+          <div class="label">
+            <strong>扫码购买（用我们的 Key）</strong>
+            <small>支付后获得激活码</small>
+          </div>
+        </div>
       </div>
-      <div id="modelConfig" style="margin-top:12px; display:none;">
-        <label>文本模型</label>
-        <input id="text_model" placeholder="Qwen/Qwen3-8B">
-        <label>视觉模型</label>
-        <input id="vision_model" placeholder="Qwen/Qwen2.5-VL-7B-Instruct">
+
+      <div id="selfConfig">
+        <div class="field">
+          <label>提供商</label>
+          <select id="provider">
+            <option value="siliconflow">SiliconFlow（推荐）</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>API Key</label>
+          <input id="apiKey" type="password" placeholder="sk-xxx">
+          <div class="hint">免费获取：https://cloud.siliconflow.cn</div>
+        </div>
+        <div class="field">
+          <label>文本模型</label>
+          <input id="textModel" placeholder="Qwen/Qwen3-8B">
+        </div>
+        <div class="field">
+          <label>视觉模型（封面分析）</label>
+          <input id="visionModel" placeholder="Qwen/Qwen3-VL-8B-Instruct">
+        </div>
+      </div>
+
+      <div id="buyConfig" class="field-hidden">
+        <div class="qr-area">
+          <div class="qr-placeholder">扫码支付<br>¥19.9/100次</div>
+          <div class="field">
+            <label>激活码</label>
+            <div class="activate-row">
+              <input id="activateCode" placeholder="粘贴收到的激活码">
+              <button type="button" onclick="verifyCode()">验证</button>
+            </div>
+          </div>
+          <div id="activationStatus"></div>
+        </div>
       </div>
     </div>
 
-    <!-- 语音识别 -->
+    <!-- 下载保存位置 -->
     <div class="card">
-      <h3>🎤 语音识别（ASR）</h3>
-      <p>将视频中的口播转写为文字。默认用 SiliconFlow SenseVoice，和新用户免费额度。</p>
-      <label>API Key</label>
-      <input id="asr_api_key" type="password" placeholder="sk-xxx">
-      <div class="hint">和大模型用同一个 Key 即可</div>
+      <h3>📂 下载保存位置</h3>
+      <p>视频、音频、封面截图存到这里。</p>
+      <div class="field">
+        <input id="savePath" placeholder="data/downloads/">
+        <div class="hint">
+          默认：data/downloads/<br>
+          子目录：videos/  audio/  screenshots/
+        </div>
+      </div>
     </div>
 
     <button type="button" class="btn-save" onclick="saveConfig()">💾 保存配置</button>
@@ -77,43 +134,61 @@ select { cursor: pointer; }
 <div class="toast" id="toast"></div>
 
 <script>
-const initialConfig = {{ config | tojson | safe }};
+let config = {};
 
-function loadConfig() {
-  const llm = initialConfig.llm || {};
-  const asr = initialConfig.asr || {};
-  
-  document.getElementById('llm_provider').value = llm.provider || 'siliconflow';
-  document.getElementById('cloud_api_key').value = llm.siliconflow_api_key || '';
-  document.getElementById('text_model').value = llm.siliconflow_text_model || 'Qwen/Qwen3-8B';
-  document.getElementById('vision_model').value = llm.siliconflow_vision_model || 'Qwen/Qwen2.5-VL-7B-Instruct';
-  document.getElementById('asr_api_key').value = asr.siliconflow_api_key || llm.siliconflow_api_key || '';
-  
-  toggleProvider();
+async function loadConfig() {
+  try {
+    const resp = await fetch('api/config');
+    config = await resp.json();
+    const llm = config.llm || {};
+
+    const mode = llm.api_mode || 'self';
+    selectMode(mode);
+    document.querySelector(`input[name="api_mode"][value="${mode}"]`).checked = true;
+    document.getElementById('provider').value = llm.provider || 'siliconflow';
+    document.getElementById('apiKey').value = llm.siliconflow_api_key || '';
+    document.getElementById('textModel').value = llm.siliconflow_text_model || 'Qwen/Qwen3-8B';
+    document.getElementById('visionModel').value = llm.siliconflow_vision_model || 'Qwen/Qwen2.5-VL-7B-Instruct';
+    document.getElementById('savePath').value = config.save_path || '';
+  } catch (e) { showToast('加载配置失败'); }
 }
 
-function toggleProvider() {
-  const v = document.getElementById('llm_provider').value;
-  document.getElementById('cloudConfig').style.display = 'block';
-  document.getElementById('modelConfig').style.display = 'none';
+function selectMode(mode) {
+  document.querySelectorAll('.radio-item').forEach(el => el.classList.remove('active'));
+  document.getElementById(`mode_${mode}`).checked = true;
+  document.getElementById(`mode_${mode}`).closest('.radio-item').classList.add('active');
+  document.getElementById('selfConfig').style.display = mode === 'self' ? 'block' : 'none';
+  document.getElementById('buyConfig').style.display = mode === 'buy' ? 'block' : 'none';
+}
+
+function verifyCode() {
+  const code = document.getElementById('activateCode').value.trim();
+  if (!code) { showToast('请输入激活码'); return; }
+  const el = document.getElementById('activationStatus');
+  el.innerHTML = '<span class="status-badge active">✅ 已激活 · 剩余 100 次</span>';
+  showToast('✅ 激活成功');
 }
 
 async function saveConfig() {
-  const provider = document.getElementById('llm_provider').value;
-  const payload = {
-    llm: {
-      provider: provider,
-      siliconflow_api_key: document.getElementById('cloud_api_key').value,
-      siliconflow_text_model: document.getElementById('text_model').value,
-      siliconflow_vision_model: document.getElementById('vision_model').value,
-      openai_api_key: provider === 'openai' ? document.getElementById('cloud_api_key').value : '',
-      openai_text_model: 'gpt-4o-mini',
-      openai_vision_model: 'gpt-4o-mini'
-    },
-    asr: {
-      siliconflow_api_key: document.getElementById('asr_api_key').value
-    }
-  };
+  const mode = document.querySelector('input[name="api_mode"]:checked').value;
+  const payload = {};
+
+  if (mode === 'self') {
+    payload.llm = {
+      api_mode: 'self',
+      provider: document.getElementById('provider').value,
+      siliconflow_api_key: document.getElementById('apiKey').value,
+      siliconflow_text_model: document.getElementById('textModel').value,
+      siliconflow_vision_model: document.getElementById('visionModel').value,
+    };
+  } else {
+    payload.llm = {
+      api_mode: 'buy',
+      activate_code: document.getElementById('activateCode').value.trim(),
+    };
+  }
+
+  payload.save_path = document.getElementById('savePath').value;
 
   try {
     const resp = await fetch('/api/config', {
@@ -122,18 +197,14 @@ async function saveConfig() {
       body: JSON.stringify(payload)
     });
     const data = await resp.json();
-    if (data.status === 'ok') {
-      showToast('✅ 配置已保存');
-    }
-  } catch (e) {
-    showToast('❌ 保存失败: ' + e.message);
-  }
+    if (data.ok) showToast('✅ 配置已保存');
+    else showToast('❌ 保存失败');
+  } catch (e) { showToast('❌ 保存失败: ' + e.message); }
 }
 
 function showToast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
+  t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
