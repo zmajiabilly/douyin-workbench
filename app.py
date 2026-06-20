@@ -81,64 +81,59 @@ def process():
 
     config = _load_config()
 
-    def _run(video_id):
+    # 先解析链接，获取 video_id
+    try:
+        info = parser.parse_url(url)
+    except Exception as e:
+        return jsonify({"error": f"链接解析失败: {str(e)}"}), 400
+
+    video_id = info.get("video_id", str(time.time()))
+    add_item(video_id=video_id, url=url,
+             title=info.get("title", ""),
+             author=info.get("author", ""),
+             like_count=info.get("like_count", 0))
+
+    def _run(info):
+        video_id = info["video_id"]
         try:
             update_item(video_id, status="parsing")
-            info = parser.parse_url(url)
-
-            vid = info.get("video_id", video_id)
-
-            update_item(vid,
-                title=info.get("title", ""),
-                author=info.get("author", ""),
-                like_count=info.get("like_count", 0))
-
-            update_item(vid, status="downloading")
+            update_item(video_id, status="downloading")
             files = downloader.download_video(info, data_dir=DATA_DIR)
-            update_item(vid,
+            update_item(video_id,
                         video_path=files["video_path"],
                         audio_path=files["audio_path"],
                         screenshot_path=files["screenshot_path"],
                         status="downloaded")
 
             if asr_enabled and files.get("audio_path"):
-                update_item(vid, status="transcribing")
+                update_item(video_id, status="transcribing")
                 transcript = asr.transcribe(files["audio_path"], config)
-                update_item(vid, transcript=transcript, status="transcribed")
+                update_item(video_id, transcript=transcript, status="transcribed")
 
             if summary_enabled:
-                update_item(vid, status="summarizing")
-                row = get_item_by_video_id(vid)
+                update_item(video_id, status="summarizing")
+                row = get_item_by_video_id(video_id)
                 text_to_summarize = (row or {}).get("transcript", "")
                 if text_to_summarize and not text_to_summarize.startswith("("):
                     summary_text = llm.summarize(text_to_summarize, config)
-                    update_item(vid, summary=summary_text)
+                    update_item(video_id, summary=summary_text)
                 if files.get("screenshot_path"):
                     cover_analysis = llm.analyze_cover(files["screenshot_path"], config)
                     existing_tags = ""
-                    row2 = get_item_by_video_id(vid)
+                    row2 = get_item_by_video_id(video_id)
                     if row2:
                         existing_tags = row2.get("tags", "") or ""
                     tags = existing_tags + (" | " + cover_analysis[:100] if existing_tags else cover_analysis[:100])
-                    update_item(vid, tags=tags)
+                    update_item(video_id, tags=tags)
 
-            update_item(vid, status="done")
+            update_item(video_id, status="done")
         except Exception as e:
             try:
                 update_item(video_id, status=f"error: {str(e)[:200]}")
             except Exception:
                 pass
 
-    # 从短链接解析 video_id 用于追踪
-    try:
-        info = parser.parse_url(url)
-        video_id = info.get("video_id", str(time.time()))
-    except Exception:
-        video_id = str(time.time())
-
-    add_item(video_id=video_id, url=url)
-    threading.Thread(target=_run, args=(video_id,), daemon=True).start()
-
+    threading.Thread(target=_run, args=(info,), daemon=True).start()
     return jsonify({"video_id": video_id}), 202
 
 
