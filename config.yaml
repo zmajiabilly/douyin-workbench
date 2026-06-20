@@ -7,7 +7,7 @@ llm:
   provider: siliconflow       # siliconflow | openai
 
   # --- SiliconFlow（云端，需要 API Key，免费额度多）---
-  siliconflow_api_key: ""     # ← 在这里填你的 API Key
+  siliconflow_api_key: ""
   siliconflow_text_model: Qwen/Qwen3-8B
   siliconflow_vision_model: Qwen/Qwen2.5-VL-7B-Instruct
 
@@ -19,4 +19,4 @@ llm:
 # 语音识别配置（转录口播文案，默认 SiliconFlow）
 asr:
   provider: siliconflow
-  siliconflow_api_key: ""     # 和上面同一个 Key 就行
+  siliconflow_api_key: ""
